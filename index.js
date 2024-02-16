@@ -41,11 +41,18 @@ app.post("/register", async (req, res) => {
     );
     if (userExists.rows.length > 0) {
       return res.status(400).json({ regUserMsg: "User already registered!" });
-    }
-    else{
-      const result = await pool.query("INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING *",[username, email, hashedPassword]);
+    } else {
+      const result = await pool.query(
+        "INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING *",
+        [username, email, hashedPassword]
+      );
       // const registeredUser = result.rows[0];
-      return res.status(200).json({regMsg: 'User registered successfully. Tap anywhere to proceed for login'});
+      return res
+        .status(200)
+        .json({
+          regMsg:
+            "User registered successfully. Tap anywhere to proceed for login",
+        });
     }
   } catch (error) {
     console.error(error);
@@ -53,8 +60,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-
-server.listen(3001, '0.0.0.0', () => {
+server.listen(3001, "0.0.0.0", () => {
   console.log("Server is running on http://0.0.0.0:3001");
 });
 
@@ -73,19 +79,26 @@ io.on("connection", (socket) => {
         if (passwordMatch) {
           const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: "1h" });
           socket.emit("loginSuccess", user, token);
-          const userMessage = messages.filter((msg) => msg.recipientUsername === user.username)
-          socket.emit("storedMessages", userMessage);
+          console.log(messages);
+          // const userMessage = messages.filter((msg) => (msg.recipientUsername === user.username || msg.senderUsername === user.username))
+          socket.emit("storedMessages", messages);
           // store user to connectedUsers store
           connectedUsers[username] = socket.id;
         } else {
-            socket.emit("loginFailure", { message: "Invalid username or password!"});
+          socket.emit("loginFailure", {
+            message: "Invalid username or password!",
+          });
         }
       } else {
-          socket.emit("loginFailure", {
-          message: "User not found. Please register!"});
+        socket.emit("loginFailure", {
+          message: "User not found. Please register!",
+        });
       }
     } catch (error) {
       console.error(error);
+      socket.emit("loginFailure", {
+        message: "Internal Server Error!",
+      });
     }
 
     // Middleware to protect routes requiring authentication
@@ -101,9 +114,8 @@ io.on("connection", (socket) => {
       const newMessage = {
         senderUsername,
         recipientUsername,
-        message: message,
+        message: message
       };
-      console.log('user foooound');
       try {
         // Get the recipient's socket ID from the connectedUsers object
         const recipientSocketId = connectedUsers[recipientUsername];
@@ -113,13 +125,14 @@ io.on("connection", (socket) => {
             senderUsername,
             message: message,
           });
-          // console.log(senderUsername);
+          messages.push(newMessage);
+          // console.log(messages);
           // messages.push(newMessage);
         } else {
           // Handle case when recipient is not connected
           console.log(`Recipient ${recipientUsername} is not connected`);
+          messages.push(newMessage);
         }
-        messages.push(newMessage);
       } catch (error) {
         console.error(error);
       }
@@ -133,17 +146,17 @@ io.on("connection", (socket) => {
       //   }
       // });
 
-  socket.on("disconnect", () => {
-    // Remove the user's entry from connectedUsers on disconnect
-    const userId = Object.keys(connectedUsers).find(
-      (key) => connectedUsers[key] === socket.id
-    );
-    if (userId) {
-      delete connectedUsers[userId];
-    }
+      socket.on("disconnect", () => {
+        // Remove the user's entry from connectedUsers on disconnect
+        const userId = Object.keys(connectedUsers).find(
+          (key) => connectedUsers[key] === socket.id
+        );
+        if (userId) {
+          delete connectedUsers[userId];
+        }
 
-    console.log(`User disconnected with socket ID: ${socket.id}`);
-  });
-  }
-);
+        console.log(`User disconnected with socket ID: ${socket.id}`);
+      });
+    }
+  );
 });
