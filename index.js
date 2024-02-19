@@ -79,7 +79,7 @@ io.on("connection", (socket) => {
         if (passwordMatch) {
           const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: "1h" });
           socket.emit("loginSuccess", user, token);
-          console.log(messages);
+        //   console.log(messages);
           // const userMessage = messages.filter((msg) => (msg.recipientUsername === user.username || msg.senderUsername === user.username))
           socket.emit("storedMessages", messages);
           // store user to connectedUsers store
@@ -110,11 +110,13 @@ io.on("connection", (socket) => {
 
   socket.on(
     "sendMessage",
-    async ({ senderUsername, recipientUsername, message }) => {
+    async ({ id, senderUsername, recipientUsername, message, time }) => {
       const newMessage = {
+        id,
         senderUsername,
         recipientUsername,
-        message: message
+        message: message,
+        time
       };
       try {
         // Get the recipient's socket ID from the connectedUsers object
