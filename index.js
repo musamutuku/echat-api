@@ -30,6 +30,19 @@ const connectedUsers = {};
 const messages = [];
 const JWT_SECRET = "your_secret_key";
 
+app.get('/users', (req, res) => {
+  // Query the database using the connection pool
+  pool.query('SELECT * FROM users', (error, result) => {
+    if (error) {
+      console.error('Error executing query', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    } else {
+      res.json(result.rows);
+    }
+  });
+});
+
+
 app.post("/register", async (req, res) => {
   const { username, email, password } = req.body;
   const hashedPassword = await bcrypt.hash(password, 10);
