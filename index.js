@@ -6,6 +6,7 @@ const { Pool } = require("pg");
 const jwt = require("jsonwebtoken");
 const { expressjwt: ejwt } = require("express-jwt");
 const bcrypt = require("bcrypt");
+const { log } = require("console");
 
 const app = express();
 app.use(cors());
@@ -92,11 +93,15 @@ io.on("connection", (socket) => {
         if (passwordMatch) {
           const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: "1h" });
           socket.emit("loginSuccess", user, token);
-        //   console.log(messages);
-          // const userMessage = messages.filter((msg) => (msg.recipientUsername === user.username || msg.senderUsername === user.username))
           socket.emit("storedMessages", messages);
           // store user to connectedUsers store
-          connectedUsers[username] = socket.id;
+          // connectedUsers[username] = {id:socket.id, username: username};
+          if (!connectedUsers[username]) {
+            // If not, create a new array to store socket IDs
+            connectedUsers[username] = [];
+          }
+          // Push the current socket ID into the array
+          connectedUsers[username].push(socket.id);
         } else {
           socket.emit("loginFailure", {
             message: "Invalid username or password!",
@@ -123,30 +128,34 @@ io.on("connection", (socket) => {
 
   socket.on(
     "sendMessage",
-    async ({ id, senderUsername, recipientUsername, message, time }) => {
+    async ({ id, senderUsername, recipientUsername, message, time, mark}) => {
       const newMessage = {
         id,
         senderUsername,
         recipientUsername,
         message: message,
-        time
+        time,
+        mark
       };
       try {
+        messages.push(newMessage);
+        var totalUnread = 0;
         // Get the recipient's socket ID from the connectedUsers object
         const recipientSocketId = connectedUsers[recipientUsername];
+        const unreadMsg = messages.filter((msg) => msg.recipientUsername === recipientUsername && msg.senderUsername === senderUsername && msg.mark === 'unread');
+        for(let count=0;count<=unreadMsg.length;count++){
+          totalUnread = count;
+        }
         if (recipientSocketId) {
           // Emit the message only to the recipient
           io.to(recipientSocketId).emit("receiveMessage", {
             senderUsername,
             message: message,
+            totalUnread
           });
-          messages.push(newMessage);
-          // console.log(messages);
-          // messages.push(newMessage);
         } else {
           // Handle case when recipient is not connected
           console.log(`Recipient ${recipientUsername} is not connected`);
-          messages.push(newMessage);
         }
       } catch (error) {
         console.error(error);
@@ -160,18 +169,17 @@ io.on("connection", (socket) => {
       //     console.error(error);
       //   }
       // });
-
-      socket.on("disconnect", () => {
-        // Remove the user's entry from connectedUsers on disconnect
-        const userId = Object.keys(connectedUsers).find(
-          (key) => connectedUsers[key] === socket.id
-        );
-        if (userId) {
-          delete connectedUsers[userId];
-        }
-
-        console.log(`User disconnected with socket ID: ${socket.id}`);
-      });
     }
   );
+  socket.on('disconnect', () => {
+    console.log(`User disconnected with socket ID: ${socket.id}`);
+    // Remove the specific socket ID associated with the disconnected socket from connectedUsers
+    Object.keys(connectedUsers).forEach((username) => {
+      connectedUsers[username] = connectedUsers[username].filter(id => id !== socket.id);
+      // If there are no more socket IDs associated with the username, remove the username entry from connectedUsers
+      if (connectedUsers[username].length === 0) {
+        delete connectedUsers[username];
+      }
+    });
+  })
 });
