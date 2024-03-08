@@ -125,6 +125,12 @@ io.on("connection", (socket) => {
     //   res.json({ message: 'Protected route accessed successfully!' });
     // });
   });
+  socket.on("markAsRead", (receiver, sender) =>{
+    messages.filter((msg) => msg.recipientUsername == receiver && msg.senderUsername == sender && msg.mark == 'unread')
+     .forEach(msg => {
+       msg.mark = 'read';
+     });
+  });
 
   socket.on(
     "sendMessage",
