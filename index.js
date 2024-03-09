@@ -79,7 +79,9 @@ server.listen(3001, "0.0.0.0", () => {
 });
 
 io.on("connection", (socket) => {
-  console.log(`User connected with socket ID: ${socket.id}`);
+  socket.on('connected',(newuser) => {
+    console.log(newuser);
+  });
 
   socket.on("login", async ({ username, password }) => {
     try {
