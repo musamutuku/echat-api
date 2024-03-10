@@ -31,6 +31,8 @@ const connectedUsers = {};
 const messages = [];
 const JWT_SECRET = "your_secret_key";
 
+io.setMaxListeners(50);
+
 app.get('/users', (req, res) => {
   // Query the database using the connection pool
   pool.query('SELECT * FROM users', (error, result) => {
@@ -77,6 +79,7 @@ app.post("/register", async (req, res) => {
 server.listen(3001, "0.0.0.0", () => {
   console.log("Server is running on http://0.0.0.0:3001");
 });
+
 
 io.on("connection", (socket) => {
   socket.on('connected',(newuser) => {
