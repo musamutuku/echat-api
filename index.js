@@ -33,18 +33,17 @@ const JWT_SECRET = "your_secret_key";
 
 io.setMaxListeners(50);
 
-app.get('/users', (req, res) => {
+app.get("/users", (req, res) => {
   // Query the database using the connection pool
-  pool.query('SELECT * FROM users', (error, result) => {
+  pool.query("SELECT * FROM users", (error, result) => {
     if (error) {
-      console.error('Error executing query', error);
-      res.status(500).json({ error: 'Internal Server Error' });
+      console.error("Error executing query", error);
+      res.status(500).json({ error: "Internal Server Error" });
     } else {
       res.json(result.rows);
     }
   });
 });
-
 
 app.post("/register", async (req, res) => {
   const { username, email, password } = req.body;
@@ -63,12 +62,10 @@ app.post("/register", async (req, res) => {
         [username, email, hashedPassword]
       );
       // const registeredUser = result.rows[0];
-      return res
-        .status(200)
-        .json({
-          regMsg:
-            "User registered successfully. Tap anywhere to proceed for login",
-        });
+      return res.status(200).json({
+        regMsg:
+          "User registered successfully. Tap anywhere to proceed for login",
+      });
     }
   } catch (error) {
     console.error(error);
@@ -80,9 +77,8 @@ server.listen(3001, "0.0.0.0", () => {
   console.log("Server is running on http://0.0.0.0:3001");
 });
 
-
 io.on("connection", (socket) => {
-  socket.on('connected',(newuser) => {
+  socket.on("connected", (newuser) => {
     console.log(newuser);
   });
 
@@ -130,31 +126,72 @@ io.on("connection", (socket) => {
     //   res.json({ message: 'Protected route accessed successfully!' });
     // });
   });
-  socket.on("markAsRead", (receiver, sender) =>{
-    messages.filter((msg) => msg.recipientUsername == receiver && msg.senderUsername == sender && msg.mark == 'unread')
-     .forEach(msg => {
-       msg.mark = 'read';
-     });
+  socket.on("markAsRead", (receiver, sender) => {
+    messages
+      .filter(
+        (msg) =>
+          msg.recipientUsername == receiver &&
+          msg.senderUsername == sender &&
+          msg.mark == "unread"
+      )
+      .forEach((msg) => {
+        msg.mark = "read";
+      });
+  });
+
+  socket.on("deleteMsg", (receiver, sender) => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (
+        (messages[i].senderUsername == sender &&
+          messages[i].recipientUsername == receiver) ||
+        (messages[i].recipientUsername == sender &&
+          messages[i].senderUsername == receiver)
+      ) {
+        messages.splice(i, 1);
+      }
+    }
+  });
+
+  socket.on("deleteMsg1", (msgDate) => {
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].date == msgDate) {
+        messages.splice(i, 1);
+      }
+    }
   });
 
   socket.on(
     "sendMessage",
-    async ({ id, senderUsername, recipientUsername, message, time, mark}) => {
+    async ({
+      id,
+      senderUsername,
+      recipientUsername,
+      message,
+      time,
+      mark,
+      date,
+    }) => {
       const newMessage = {
         id,
         senderUsername,
         recipientUsername,
         message: message,
         time,
-        mark
+        mark,
+        date,
       };
       try {
         messages.push(newMessage);
         var totalUnread = 0;
         // Get the recipient's socket ID from the connectedUsers object
         const recipientSocketId = connectedUsers[recipientUsername];
-        const unreadMsg = messages.filter((msg) => msg.recipientUsername === recipientUsername && msg.senderUsername === senderUsername && msg.mark === 'unread');
-        for(let count=0;count<=unreadMsg.length;count++){
+        const unreadMsg = messages.filter(
+          (msg) =>
+            msg.recipientUsername === recipientUsername &&
+            msg.senderUsername === senderUsername &&
+            msg.mark === "unread"
+        );
+        for (let count = 0; count <= unreadMsg.length; count++) {
           totalUnread = count;
         }
         if (recipientSocketId) {
@@ -162,7 +199,8 @@ io.on("connection", (socket) => {
           io.to(recipientSocketId).emit("receiveMessage", {
             senderUsername,
             message: message,
-            totalUnread
+            totalUnread,
+            date,
           });
         } else {
           // Handle case when recipient is not connected
@@ -182,15 +220,17 @@ io.on("connection", (socket) => {
       // });
     }
   );
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     console.log(`User disconnected with socket ID: ${socket.id}`);
-    // Remove the specific socket ID associated with the disconnected socket from connectedUsers
+    // Remove the specific socket   ID associated with the disconnected socket from connectedUsers
     Object.keys(connectedUsers).forEach((username) => {
-      connectedUsers[username] = connectedUsers[username].filter(id => id !== socket.id);
+      connectedUsers[username] = connectedUsers[username].filter(
+        (id) => id !== socket.id
+      );
       // If there are no more socket IDs associated with the username, remove the username entry from connectedUsers
       if (connectedUsers[username].length === 0) {
         delete connectedUsers[username];
       }
     });
-  })
+  });
 });
