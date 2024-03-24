@@ -2,11 +2,13 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
-const { Pool } = require("pg");
+// const { Pool } = require("pg");
 const jwt = require("jsonwebtoken");
 const { expressjwt: ejwt } = require("express-jwt");
 const bcrypt = require("bcrypt");
 const { log } = require("console");
+const dotenv = require('dotenv');
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -18,13 +20,15 @@ const io = new Server(server, {
   },
 });
 
-const pool = new Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "echat",
-  password: "musa",
-  port: 5432,
-});
+// const pool = new Pool({
+//   user: process.env.PG_USER,
+//   host: process.env.PG_HOST,
+//   database: process.env.PG_DATABASE,
+//   password: process.env.PG_PASSWORD,
+//   port: process.env.PG_PORT,
+// });
+const pool = require('./dbConfig');
+
 
 app.use(express.json());
 const connectedUsers = {};
@@ -32,6 +36,10 @@ const messages = [];
 const JWT_SECRET = "your_secret_key";
 
 io.setMaxListeners(50);
+
+app.get("/", (req, res) => {
+  res.send("welcome to chat api");
+});
 
 app.get("/users", (req, res) => {
   // Query the database using the connection pool
@@ -73,8 +81,10 @@ app.post("/register", async (req, res) => {
   }
 });
 
-server.listen(3001, "0.0.0.0", () => {
-  console.log("Server is running on http://0.0.0.0:3001");
+const host = process.env.PG_HOST
+const port = process.env.PORT
+server.listen(3001, host, () => {
+  console.log(`Server is running on http://${host}:${port}`);
 });
 
 io.on("connection", (socket) => {
