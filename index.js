@@ -81,11 +81,12 @@ app.post("/register", async (req, res) => {
   }
 });
 
-const host = "localhost"
-const port = 3001
-server.listen(3001, host, () => {
+const host = process.env.HOST
+const port = process.env.PORT
+server.listen(port, host, () => {
   console.log(`Server is running on http://${host}:${port}`);
 });
+
 
 io.on("connection", (socket) => {
   socket.on("connected", (newuser) => {
