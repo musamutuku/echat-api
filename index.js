@@ -81,7 +81,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-const host = process.env.PG_HOST
+const host = "localhost"
 const port = 3001
 server.listen(3001, host, () => {
   console.log(`Server is running on http://${host}:${port}`);
