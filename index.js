@@ -7,7 +7,7 @@ const jwt = require("jsonwebtoken");
 const { expressjwt: ejwt } = require("express-jwt");
 const bcrypt = require("bcrypt");
 const { log } = require("console");
-const dotenv = require('dotenv');
+const dotenv = require("dotenv");
 dotenv.config();
 
 const app = express();
@@ -27,8 +27,7 @@ const io = new Server(server, {
 //   password: process.env.PG_PASSWORD,
 //   port: process.env.PG_PORT,
 // });
-const pool = require('./dbConfig');
-
+const pool = require("./dbConfig");
 
 app.use(express.json());
 const connectedUsers = {};
@@ -57,23 +56,45 @@ app.post("/register", async (req, res) => {
   const { username, email, password } = req.body;
   const hashedPassword = await bcrypt.hash(password, 10);
   try {
-    // Check if the user with the provided ID already exists in the database
+    // Check if the user with the provided username already exists in the database
     const userExists = await pool.query(
       "SELECT * FROM users WHERE username = $1",
       [username]
     );
     if (userExists.rows.length > 0) {
-      return res.status(400).json({ regUserMsg: "User already registered!" });
+      if (userExists.rows[0].verification == "verified") {
+        return res.status(400).json({ regUserMsg: "User already registered!" });
+      } else {
+        return res.status(400).json({
+          regUserMsg01:
+            "User has a pending verification. Enter OTP send to your Email or",
+        });
+      }
     } else {
+      const otp = Math.floor(1000 + Math.random() * 9000); // Generate 4-digit OTP
       const result = await pool.query(
-        "INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING *",
-        [username, email, hashedPassword]
+        "INSERT INTO users (username, email, password, OTP, verification) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+        [username, email, hashedPassword, otp, "pending"]
       );
+      sendMail(email, otp)
+        .then(() => {
+          res
+            .status(200)
+            .json({
+              OTPmessage: "OTP has been send to your email for verification",
+            });
+          return res.status(200).json({
+            regUserMsg01: `ENTER OTP SEND TO YOUR EMAIL FOR VERIFICATION`,
+          });
+        })
+        .catch((error) => {
+          console.log(error);
+          // res.status(500).json({ error: "Internal Server Error!" });
+          res
+            .status(500)
+            .json({ OTPmessage1: "Failed to send OTP for verification" });
+        });
       // const registeredUser = result.rows[0];
-      return res.status(200).json({
-        regMsg:
-          "User registered successfully. Tap anywhere to proceed for login",
-      });
     }
   } catch (error) {
     console.error(error);
@@ -81,12 +102,157 @@ app.post("/register", async (req, res) => {
   }
 });
 
-const host = process.env.HOST
-const port = process.env.PORT
+// OTP verification process
+const bodyParser = require("body-parser");
+
+// Middleware
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// Routes
+app.post("/verify", async (req, res) => {
+  const { otp, username } = req.body;
+  try {
+    // Check if the user with the provided username already exists in the database
+    const userExists = await pool.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+    if (userExists.rows.length > 0) {
+      if (userExists.rows[0].otp == otp) {
+        const query =
+          "UPDATE users SET verification = $1 WHERE username = $2 RETURNING *";
+        const values = ["verified", username];
+        const result = await pool.query(query, values);
+        if (result.rows.length > 0) {
+          return res.status(200).json({
+            regMsg:
+              "User registered successfully. Tap anywhere to proceed for login",
+          });
+        }
+      } else {
+        return res.status(400).json({ regUserMsg02: "incorrect OTP!" });
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error!" });
+  }
+});
+
+app.post("/resend-otp", async (req, res) => {
+  const { username } = req.body;
+  const otp = Math.floor(1000 + Math.random() * 9000); // Generate 4-digit OTP
+  try {
+    // Check if the user with the provided username already exists in the database
+    const userExists = await pool.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+    if (userExists.rows.length > 0) {
+      const email = userExists.rows[0].email;
+      sendMail(email, otp)
+        .then(() => {
+          res.status(200).json({ OTPmessage: "OTP resend successfully" });
+          const query = "UPDATE users SET otp = $1 WHERE username = $2 RETURNING *";
+          const values = [otp, username];
+          const result = pool.query(query, values);
+          if (result.rows.length > 0) {
+            return res.status(200).json({
+              regUserMsg01: `New OTP has been resend to your Email. Check in the Email and enter it here`,
+            });
+          }
+        })
+        .catch((error) => {
+          console.log(error);
+          // res.status(500).json({ error: "Internal Server Error!" });
+          res.status(500).json({ OTPmessage1: "Failed to resend OTP" });
+        });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error!" });
+  }
+});
+
+const nodemailer = require("nodemailer");
+const transporter = nodemailer.createTransport({
+  service: "Gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.APP_MAIL,
+    pass: process.env.MAIL_PASS,
+  },
+});
+
+function sendMail(email, otp) {
+  const mailOptions = {
+    from: "eChat <musamutuku2020@gmail.com>",
+    to: email,
+    subject: "OTP Verification",
+    text: `Your OTP is ${otp}`,
+  };
+  return transporter.sendMail(mailOptions);
+}
+
+function sendMail1(email, resetPassword) {
+  const mailOptions = {
+    from: "eChat <musamutuku2020@gmail.com>",
+    to: email,
+    subject: "Password Reset",
+    text: `Your New Password is ${resetPassword}`,
+  };
+  return transporter.sendMail(mailOptions);
+}
+
+app.post("/reset", async (req, res) => {
+  const { username, email } = req.body;
+  const resetPassword = Math.floor(100000 + Math.random() * 900000).toString(); // Generate 6-digit Password
+  console.log(resetPassword);
+  const hashedPassword = await bcrypt.hash(resetPassword, 10);
+  try {
+    // Check if the user with the provided username already exists in the database
+    const userExists = await pool.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+    if (userExists.rows.length > 0) {
+      if (userExists.rows[0].email == email) {
+        sendMail1(email, resetPassword)
+        .then(() => {
+          res.status(200).json({ OTPmessage: "New password mailed to you successfully" });
+          const query = "UPDATE users SET password = $1 WHERE username = $2 RETURNING *";
+          const values = [hashedPassword, username];
+          const result = pool.query(query, values);
+          if (result.rows.length > 0) {
+            return res.status(200).json({
+              resetSuccess: "New password has been mailed to you. Use the password to login and change it.",
+            });
+          }
+        })
+        .catch((error) => {
+          console.log(error);
+          res.status(500).json({ OTPmessage1: "Password mailing failed! Try later" });
+        });
+      } else {
+        return res.status(400).json({ resetError: "incorrect email address!" });
+      }
+    } else {
+      return res.status(400).json({ resetError: "username does not exist!" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error!" });
+  }
+});
+
+const host = process.env.HOST;
+const port = process.env.PORT;
 server.listen(port, host, () => {
   console.log(`Server is running on http://${host}:${port}`);
 });
-
 
 io.on("connection", (socket) => {
   socket.on("connected", (newuser) => {
@@ -104,7 +270,14 @@ io.on("connection", (socket) => {
         const passwordMatch = await bcrypt.compare(password, user.password);
         if (passwordMatch) {
           const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: "1h" });
-          socket.emit("loginSuccess", user, token);
+          if (user.verification != "verified") {
+            socket.emit("loginUnverified", user, {
+              regUserMsg01:
+                "User has a pending verification. Enter OTP send to your Email or",
+            });
+          } else {
+            socket.emit("loginSuccess", user, token);
+          }
           socket.emit("storedMessages", messages);
           // store user to connectedUsers store
           // connectedUsers[username] = {id:socket.id, username: username};
