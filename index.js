@@ -78,10 +78,8 @@ app.post("/register", async (req, res) => {
       );
       sendMail(email, otp)
         .then(() => {
-          res.status(200).json({
-            OTPmessage: "OTP has been send to your email for verification",
-          });
           return res.status(200).json({
+            OTPmessage: "OTP has been send to your email for verification",
             regUserMsg01: `Enter OTP send to your email for verification`,
           });
         })
@@ -153,16 +151,14 @@ app.post("/resend-otp", async (req, res) => {
       const email = userExists.rows[0].email;
       sendMail(email, otp)
         .then(() => {
-          res.status(200).json({ OTPmessage: "OTP has been resend to your email successfully" });
           const query =
             "UPDATE users SET otp = $1 WHERE username = $2 RETURNING *";
           const values = [otp, username];
           const result = pool.query(query, values);
-          if (result.rows.length > 0) {
-            return res.status(200).json({
-              regUserMsg01: `New OTP has been resend to your Email. Check in the Email and enter it here`,
-            });
-          }
+          return res.status(200).json({
+            OTPmessage: "OTP has been resend to your email successfully",
+            regUserMsg01: `New OTP has been resend to your Email. Check in the Email and enter it here`,
+          });
         })
         .catch((error) => {
           console.log(error);
@@ -224,15 +220,13 @@ app.post("/reset", async (req, res) => {
       if (userExists.rows[0].email == email) {
         sendMail1(email, resetPassword)
           .then(() => {
-            res
-              .status(200)
-              .json({ OTPmessage: "New password has been send to your email" });
             const query =
               "UPDATE users SET password = $1 WHERE username = $2 RETURNING *";
             const values = [hashedPassword, username];
             const result = pool.query(query, values);
             if (result.rows.length > 0) {
               return res.status(200).json({
+                OTPmessage: "New password has been send to your email",
                 resetSuccess:
                   "New password has been mailed to you. Use the password to login and change it.",
               });
