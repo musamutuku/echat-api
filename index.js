@@ -67,7 +67,7 @@ app.post("/register", async (req, res) => {
       } else {
         return res.status(400).json({
           regUserMsg01:
-            "User has a pending verification. Enter OTP send to your Email or",
+            "User has a pending verification. Enter OTP send to your email or",
         });
       }
     } else {
@@ -78,13 +78,11 @@ app.post("/register", async (req, res) => {
       );
       sendMail(email, otp)
         .then(() => {
-          res
-            .status(200)
-            .json({
-              OTPmessage: "OTP has been send to your email for verification",
-            });
+          res.status(200).json({
+            OTPmessage: "OTP has been send to your email for verification",
+          });
           return res.status(200).json({
-            regUserMsg01: `ENTER OTP SEND TO YOUR EMAIL FOR VERIFICATION`,
+            regUserMsg01: `Enter OTP send to your email for verification`,
           });
         })
         .catch((error) => {
@@ -92,7 +90,9 @@ app.post("/register", async (req, res) => {
           // res.status(500).json({ error: "Internal Server Error!" });
           res
             .status(500)
-            .json({ OTPmessage1: "Failed to send OTP for verification" });
+            .json({
+              OTPmessage1: "Failed to send OTP for verification. Try later!",
+            });
         });
       // const registeredUser = result.rows[0];
     }
@@ -131,7 +131,7 @@ app.post("/verify", async (req, res) => {
           });
         }
       } else {
-        return res.status(400).json({ regUserMsg02: "incorrect OTP!" });
+        return res.status(400).json({ regUserMsg02: "Incorrect OTP!" });
       }
     }
   } catch (error) {
@@ -153,8 +153,9 @@ app.post("/resend-otp", async (req, res) => {
       const email = userExists.rows[0].email;
       sendMail(email, otp)
         .then(() => {
-          res.status(200).json({ OTPmessage: "OTP resend successfully" });
-          const query = "UPDATE users SET otp = $1 WHERE username = $2 RETURNING *";
+          res.status(200).json({ OTPmessage: "OTP has been resend to your email successfully" });
+          const query =
+            "UPDATE users SET otp = $1 WHERE username = $2 RETURNING *";
           const values = [otp, username];
           const result = pool.query(query, values);
           if (result.rows.length > 0) {
@@ -166,7 +167,9 @@ app.post("/resend-otp", async (req, res) => {
         .catch((error) => {
           console.log(error);
           // res.status(500).json({ error: "Internal Server Error!" });
-          res.status(500).json({ OTPmessage1: "Failed to resend OTP" });
+          res
+            .status(500)
+            .json({ OTPmessage1: "Failed to resend OTP. Try again later!" });
         });
     }
   } catch (error) {
@@ -210,7 +213,6 @@ function sendMail1(email, resetPassword) {
 app.post("/reset", async (req, res) => {
   const { username, email } = req.body;
   const resetPassword = Math.floor(100000 + Math.random() * 900000).toString(); // Generate 6-digit Password
-  console.log(resetPassword);
   const hashedPassword = await bcrypt.hash(resetPassword, 10);
   try {
     // Check if the user with the provided username already exists in the database
@@ -221,32 +223,134 @@ app.post("/reset", async (req, res) => {
     if (userExists.rows.length > 0) {
       if (userExists.rows[0].email == email) {
         sendMail1(email, resetPassword)
-        .then(() => {
-          res.status(200).json({ OTPmessage: "New password mailed to you successfully" });
-          const query = "UPDATE users SET password = $1 WHERE username = $2 RETURNING *";
-          const values = [hashedPassword, username];
-          const result = pool.query(query, values);
-          if (result.rows.length > 0) {
-            return res.status(200).json({
-              resetSuccess: "New password has been mailed to you. Use the password to login and change it.",
-            });
-          }
-        })
-        .catch((error) => {
-          console.log(error);
-          res.status(500).json({ OTPmessage1: "Password mailing failed! Try later" });
-        });
+          .then(() => {
+            res
+              .status(200)
+              .json({ OTPmessage: "New password has been send to your email" });
+            const query =
+              "UPDATE users SET password = $1 WHERE username = $2 RETURNING *";
+            const values = [hashedPassword, username];
+            const result = pool.query(query, values);
+            if (result.rows.length > 0) {
+              return res.status(200).json({
+                resetSuccess:
+                  "New password has been mailed to you. Use the password to login and change it.",
+              });
+            }
+          })
+          .catch((error) => {
+            console.log(error);
+            res
+              .status(500)
+              .json({ OTPmessage1: "Password mailing failed! Try again later" });
+          });
       } else {
-        return res.status(400).json({ resetError: "incorrect email address!" });
+        return res.status(400).json({ resetError: "Invalid email address!" });
       }
     } else {
-      return res.status(400).json({ resetError: "username does not exist!" });
+      return res.status(400).json({ resetError: "Username does not exist!" });
     }
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Internal Server Error!" });
   }
 });
+
+app.post("/changepassword", async (req, res) => {
+  const { username, pswd, newPassword } = req.body;
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  try {
+    // Check if the user with the provided username already exists in the database
+    const userExists = await pool.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+    if (userExists.rows.length > 0) {
+      const passwordMatch = await bcrypt.compare(pswd, userExists.rows[0].password);
+      if(passwordMatch){
+        const query = "UPDATE users SET password = $1 WHERE username = $2 RETURNING *";
+        const values = [hashedPassword, username];
+        const result = pool.query(query, values);
+        return res.status(200).json({ pswdMessage: "Password has been changed successfully"});
+      }
+      else{
+        return res.status(400).json({ pswdMessage1: "The current password you entered is incorrect" });
+      }
+    } else {
+      return res.status(400).json({ pswdMessage1: "Login session has expired. Refresh and login again" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error!" });
+  }
+});
+
+
+app.post("/deleteAccount", async (req, res) => {
+  const { username, pswd1 } = req.body;
+  try {
+    // Check if the user with the provided username already exists in the database
+    const userExists = await pool.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+    if (userExists.rows.length > 0) {
+      const passwordMatch = await bcrypt.compare(pswd1, userExists.rows[0].password);
+      if(passwordMatch){
+        const query = "DELETE FROM users WHERE username = $1";
+        const value = [username];
+        const result = pool.query(query, value);
+        return res.status(200).json({ pswdMessage: "Account has been deleted successfully"});
+      }
+      else{
+        return res.status(400).json({ pswdMessage1: "The password you entered is incorrect. Try again!" });
+      }
+    } else {
+      return res.status(400).json({ pswdMessage1: "Login session has expired. Refresh and login again" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error!" });
+  }
+});
+
+
+// uploading image
+const multer  = require('multer');
+const path = require('path');
+   //set up storage engine
+const storage = multer.diskStorage({
+  destination: './uploads',
+  filename: (req, file, cb) =>{
+    cb(null, `${Date.now()}-${file.originalname}`)
+  },
+})
+
+const upload = multer({storage})
+  //serve static files
+app.use('/uploads', express.static(path.join(__dirname,'uploads')))
+  //file upload endpoint
+app.post('/upload',upload.single('image'), async (req,res) =>{
+  const { filename } = req.file;
+  const { username } = req.body;
+  try{
+    const userExists = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
+    if (userExists.rows.length > 0) {
+      const client = await pool.connect();
+      const query = 'UPDATE users SET profile_image = $1 WHERE username = $2 RETURNING profile_image'
+      const values = [filename,username]
+      const result = await client.query(query, values)
+      client.release()
+      res.json({filename: result.rows[0].profile_image})
+    } else {
+      res.status(500).json({error: 'Internal server error'})
+    }
+  } catch (error){
+    res.status(500).json({error: 'Internal server error'})
+  }
+})
+
+
 
 const host = process.env.HOST;
 const port = process.env.PORT;
@@ -273,7 +377,7 @@ io.on("connection", (socket) => {
           if (user.verification != "verified") {
             socket.emit("loginUnverified", user, {
               regUserMsg01:
-                "User has a pending verification. Enter OTP send to your Email or",
+                "User has a pending verification. Enter OTP send to your email or",
             });
           } else {
             socket.emit("loginSuccess", user, token);
@@ -289,7 +393,7 @@ io.on("connection", (socket) => {
           connectedUsers[username].push(socket.id);
         } else {
           socket.emit("loginFailure", {
-            message: "Invalid username or password!",
+            message: "Invalid password!",
           });
         }
       } else {
