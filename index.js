@@ -387,7 +387,7 @@ io.on("connection", (socket) => {
           connectedUsers[username].push(socket.id);
         } else {
           socket.emit("loginFailure", {
-            message: "Invalid password!",
+            message: "Incorrect password!",
           });
         }
       } else {
