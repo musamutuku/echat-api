@@ -63,7 +63,7 @@ app.post("/register", async (req, res) => {
     );
     if (userExists.rows.length > 0) {
       if (userExists.rows[0].verification == "verified") {
-        return res.status(400).json({ regUserMsg: "User already registered!" });
+        return res.status(400).json({ regUserMsg: "Username already taken!" });
       } else {
         return res.status(400).json({
           regUserMsg01:
