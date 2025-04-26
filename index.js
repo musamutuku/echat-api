@@ -356,29 +356,33 @@ const upload = multer({ storage: storage });
 
 // file upload endpoint
 app.post('/upload', upload.single('image'), async (req, res) => {
-  const { username } = req.body;
-  const imageBuffer = req.file.buffer; // <-- file content as Buffer
-
   try {
-    const userExists = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
-    if (userExists.rows.length > 0) {
-      const client = await pool.connect();
-      const query = 'UPDATE users SET profile_image = $1 WHERE username = $2 RETURNING profile_image';
-      const values = [imageBuffer, username];
-      const result = await client.query(query, values);
-      client.release();
+    const { username } = req.body;
+    const imageBuffer = req.file?.buffer; // safe way to access buffer
 
-      const base64Image = result.rows[0].profile_image.toString('base64');
-      res.json({ imageData: base64Image });
-
-    } else {
-      res.status(404).json({ error: 'User not found' });
+    if (!username || !imageBuffer) {
+      return res.status(400).json({ error: "Username or image is missing" });
     }
+
+    const userExists = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
+    if (userExists.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const result = await pool.query(
+      'UPDATE users SET profile_image = $1 WHERE username = $2 RETURNING profile_image',
+      [imageBuffer, username]
+    );
+
+    const base64Image = result.rows[0].profile_image.toString('base64');
+    res.json({ imageData: base64Image });
+
   } catch (error) {
-    console.error("Error uploading image:", error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Upload error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 
 
