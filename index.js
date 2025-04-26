@@ -309,40 +309,76 @@ app.post("/deleteAccount", async (req, res) => {
 });
 
 
-// uploading image
-const multer  = require('multer');
-const path = require('path');
-   //set up storage engine
-const storage = multer.diskStorage({
-  destination: './uploads',
-  filename: (req, file, cb) =>{
-    cb(null, `${Date.now()}-${file.originalname}`)
-  },
-})
+// // uploading image
+// const multer  = require('multer');
+// const path = require('path');
+//    //set up storage engine
+// const storage = multer.diskStorage({
+//   destination: './uploads',
+//   filename: (req, file, cb) =>{
+//     cb(null, `${Date.now()}-${file.originalname}`)
+//   },
+// })
 
-const upload = multer({storage})
-  //serve static files
-app.use('/uploads', express.static(path.join(__dirname,'uploads')))
-  //file upload endpoint
-app.post('/upload',upload.single('image'), async (req,res) =>{
-  const { filename } = req.file;
+// const upload = multer({storage})
+//   //serve static files
+// app.use('/uploads', express.static(path.join(__dirname,'uploads')))
+//   //file upload endpoint
+// app.post('/upload',upload.single('image'), async (req,res) =>{
+//   const { filename } = req.file;
+//   const { username } = req.body;
+//   try{
+//     const userExists = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
+//     if (userExists.rows.length > 0) {
+//       const client = await pool.connect();
+//       const query = 'UPDATE users SET profile_image = $1 WHERE username = $2 RETURNING profile_image'
+//       const values = [filename,username]
+//       const result = await client.query(query, values)
+//       client.release()
+//       res.json({filename: result.rows[0].profile_image})
+//     } else {
+//       res.status(500).json({error: 'Internal server error'})
+//     }
+//   } catch (error){
+//     res.status(500).json({error: 'Internal server error'})
+//   }
+// })
+
+const multer = require('multer');
+const path = require('path');
+
+// set up memory storage (no file saved to disk)
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// NO NEED for uploads folder anymore
+// app.use('/uploads', express.static(path.join(__dirname,'uploads')))   <-- REMOVE THIS
+
+// file upload endpoint
+app.post('/upload', upload.single('image'), async (req, res) => {
   const { username } = req.body;
-  try{
+  const imageBuffer = req.file.buffer; // <-- file content as Buffer
+
+  try {
     const userExists = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
     if (userExists.rows.length > 0) {
       const client = await pool.connect();
-      const query = 'UPDATE users SET profile_image = $1 WHERE username = $2 RETURNING profile_image'
-      const values = [filename,username]
-      const result = await client.query(query, values)
-      client.release()
-      res.json({filename: result.rows[0].profile_image})
+      const query = 'UPDATE users SET profile_image = $1 WHERE username = $2 RETURNING profile_image';
+      const values = [imageBuffer, username];
+      const result = await client.query(query, values);
+      client.release();
+
+      const base64Image = result.rows[0].profile_image.toString('base64');
+      res.json({ imageData: base64Image });
+
     } else {
-      res.status(500).json({error: 'Internal server error'})
+      res.status(404).json({ error: 'User not found' });
     }
-  } catch (error){
-    res.status(500).json({error: 'Internal server error'})
+  } catch (error) {
+    console.error("Error uploading image:", error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-})
+});
 
 
 
