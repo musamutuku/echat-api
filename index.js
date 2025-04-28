@@ -377,6 +377,30 @@ app.post('/upload', upload.single('image'), async (req, res) => {
   }
 });
 
+app.get('/get-profile-image/:username', async (req, res) => {
+  const { username } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT profile_image FROM users WHERE username = $1',
+      [username]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].profile_image) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    const imageBuffer = result.rows[0].profile_image;
+    const base64Image = imageBuffer.toString('base64');
+
+    res.json({ imageData: base64Image });
+
+  } catch (error) {
+    console.error('Error fetching image:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
 
 
 
