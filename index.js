@@ -309,63 +309,6 @@ app.post("/deleteAccount", async (req, res) => {
 });
 
 
-// const multer = require('multer');
-// const upload = multer(); // No diskStorage needed, use memory
-
-// app.post('/upload', upload.single('image'), async (req, res) => {
-//   try {
-//     const { username } = req.body;
-
-//     if (!username || !req.file) {
-//       return res.status(400).json({ error: 'Username or image file missing' });
-//     }
-
-//     const imageBuffer = req.file.buffer;
-
-//     const userExists = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
-//     if (userExists.rows.length === 0) {
-//       return res.status(404).json({ error: 'User not found' });
-//     }
-
-//     const updateResult = await pool.query(
-//       'UPDATE users SET profile_image = $1 WHERE username = $2 RETURNING profile_image',
-//       [imageBuffer, username]
-//     );
-
-//     const base64Image = updateResult.rows[0].profile_image.toString('base64');
-
-//     res.status(200).json({ imageData: base64Image });
-
-//   } catch (error) {
-//     console.error('Upload Error:', error.message);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
-// });
-
-// app.get('/get-profile-image/:username', async (req, res) => {
-//   const { username } = req.params;
-//   try {
-//     const result = await pool.query(
-//       'SELECT profile_image FROM users WHERE username = $1',
-//       [username]
-//     );
-
-//     if (result.rows.length === 0 || !result.rows[0].profile_image) {
-//       return res.status(404).json({ error: 'Image not found' });
-//     }
-
-//     const imageBuffer = result.rows[0].profile_image;
-//     const base64Image = imageBuffer.toString('base64');
-
-//     res.json({ imageData: base64Image });
-
-//   } catch (error) {
-//     console.error('Error fetching image:', error);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
-// });
-
-
 const multer = require('multer');
 const upload = multer(); // Upload into memory (not saving file)
 
